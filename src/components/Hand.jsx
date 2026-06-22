@@ -1,11 +1,15 @@
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import Coin from "./Coin.jsx";
+import { getHandAssetSrc } from "./handAssets.js";
 
 const fingerBase = "stroke-[#8d4b2d] stroke-[1.6]";
 const nailBase = "fill-[#fff0e8] stroke-[#b9785d] stroke-[1]";
 
-function HandArt({ side, isOpen, hasCoin, isCorrect, isSelected }) {
+function FallbackHandArt({ side, handState, isCorrect }) {
+  const isOpen = handState !== "fist";
   const flip = side === "right" ? "scale-x-[-1]" : "";
+  const showCoin = handState === "open-coin";
 
   const palm = {
     closed: { d: "M107 98 C83 105 70 130 78 154 C88 187 129 204 163 190 C196 176 208 136 191 111 C174 86 139 88 107 98 Z" },
@@ -45,12 +49,7 @@ function HandArt({ side, isOpen, hasCoin, isCorrect, isSelected }) {
   ];
 
   return (
-    <svg
-      className={`h-full w-full ${flip} drop-shadow-2xl`}
-      viewBox="0 0 240 240"
-      role="img"
-      aria-hidden="true"
-    >
+    <svg className={`h-full w-full ${flip} drop-shadow-2xl`} viewBox="0 0 240 240" role="img" aria-hidden="true">
       <defs>
         <linearGradient id={`skin-${side}`} x1="45" x2="196" y1="33" y2="204" gradientUnits="userSpaceOnUse">
           <stop stopColor="#ffd1b8" />
@@ -70,6 +69,7 @@ function HandArt({ side, isOpen, hasCoin, isCorrect, isSelected }) {
         {fingers.map((finger) => {
           const pose = isOpen ? finger.open : finger.closed;
           const nailOpacity = isOpen ? 1 : 0.12;
+
           return (
             <motion.g
               key={finger.id}
@@ -132,30 +132,34 @@ function HandArt({ side, isOpen, hasCoin, isCorrect, isSelected }) {
         <path d="M93 175 C104 210 164 219 185 183 C174 201 123 205 93 175 Z" fill={`url(#warm-${side})`} opacity="0.75" />
       </motion.g>
 
-      {isSelected && !isOpen ? (
-        <motion.circle
-          cx="122"
-          cy="136"
-          r="84"
-          fill="none"
-          stroke="#fef3c7"
-          strokeWidth="3"
-          initial={{ opacity: 0.75, scale: 0.62 }}
-          animate={{ opacity: 0, scale: 1.1 }}
-          transition={{ duration: 0.5 }}
-        />
-      ) : null}
+      <motion.circle
+        cx="122"
+        cy="136"
+        r="84"
+        fill="none"
+        stroke="#fef3c7"
+        strokeWidth="3"
+        initial={false}
+        animate={{ opacity: isOpen ? 0 : 0.75, scale: isOpen ? 1.1 : 0.62 }}
+        transition={{ duration: 0.5 }}
+      />
       <foreignObject x="0" y="0" width="240" height="240" className={flip}>
         <div className="relative h-full w-full">
-          <Coin visible={isOpen && hasCoin} />
+          <Coin visible={showCoin} />
         </div>
       </foreignObject>
     </svg>
   );
 }
 
-export default function Hand({ side, isOpen, hasCoin, isSelected, isCorrect, disabled, onChoose }) {
+export default function Hand({ side, handState, isSelected, isCorrect, disabled, onChoose }) {
   const label = side === "left" ? "Left Hand" : "Right Hand";
+  const src = useMemo(() => getHandAssetSrc(side, handState), [side, handState]);
+  const [hasImageError, setHasImageError] = useState(false);
+
+  useEffect(() => {
+    setHasImageError(false);
+  }, [src]);
 
   return (
     <motion.button
@@ -169,15 +173,45 @@ export default function Hand({ side, isOpen, hasCoin, isSelected, isCorrect, dis
           onChoose(side);
         }
       }}
-      className={`group relative flex aspect-square w-full max-w-[10rem] flex-col items-center justify-center rounded-[1.25rem] border border-slate-200 bg-white p-2 shadow-[0_16px_40px_rgba(15,23,42,0.12)] outline-none transition-colors focus-visible:ring-4 focus-visible:ring-slate-400 sm:max-w-[18rem] sm:p-4 md:max-w-[22rem] ${
+      className={`group relative flex aspect-square w-[clamp(8.25rem,26vw,11.75rem)] flex-none items-center justify-center overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.12)] outline-none transition-colors focus-visible:ring-4 focus-visible:ring-slate-400 sm:w-[clamp(10.25rem,22vw,14.75rem)] sm:p-3 lg:w-[clamp(11.5rem,18vw,16.5rem)] ${
         disabled ? "cursor-default" : "cursor-pointer hover:bg-slate-50"
-      } ${isCorrect ? "border-amber-400 bg-amber-50" : ""}`}
+      } ${isSelected ? "ring-2 ring-slate-300 ring-offset-2 ring-offset-white" : ""} ${isCorrect ? "border-amber-400 bg-amber-50" : ""}`}
       whileHover={disabled ? undefined : { y: -10, scale: 1.025 }}
       whileTap={disabled ? undefined : { scale: 0.96 }}
       animate={isCorrect ? { y: [0, -8, 0] } : { y: 0 }}
       transition={{ duration: 0.34, ease: "easeOut" }}
     >
-      <HandArt side={side} isOpen={isOpen} hasCoin={hasCoin} isCorrect={isCorrect} isSelected={isSelected} />
+      <div className="relative h-full w-full p-1 sm:p-2">
+        <AnimatePresence mode="wait">
+          {hasImageError ? (
+            <motion.div
+              key="fallback"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.22 }}
+              className="h-full w-full"
+            >
+              <FallbackHandArt side={side} handState={handState} isCorrect={isCorrect} />
+            </motion.div>
+          ) : (
+            <motion.img
+              key={src}
+              src={src}
+              alt=""
+              aria-hidden="true"
+              className="h-full w-full object-contain drop-shadow-2xl"
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: -6 }}
+              transition={{ duration: 0.25 }}
+              onError={() => setHasImageError(true)}
+              draggable="false"
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
       <span className="absolute bottom-3 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[0.68rem] font-black uppercase tracking-[0.12em] text-slate-950 shadow-sm sm:bottom-5 sm:px-4 sm:py-2 sm:text-sm md:text-base">
         {label}
       </span>

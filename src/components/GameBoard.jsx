@@ -33,6 +33,13 @@ export default function GameBoard() {
   const isComplete = gameResult !== null;
   const resultText = gameResult === "win" ? "You Won!" : "You Lost!";
   const resultTone = gameResult === "win" ? "text-emerald-700" : "text-rose-700";
+  const getHandState = useCallback(
+    (hand) => {
+      if (!isRevealed) return "fist";
+      return coinHand === hand ? "open-coin" : "open-empty";
+    },
+    [coinHand, isRevealed],
+  );
 
   const chooseHand = useCallback(
     (hand) => {
@@ -123,13 +130,12 @@ export default function GameBoard() {
               </AnimatePresence>
             </div>
 
-            <div className="grid grid-cols-2 gap-0">
+            <div className="mx-auto grid w-full max-w-4xl grid-cols-2 justify-items-center gap-x-4 sm:gap-x-6 lg:gap-x-8">
               {HANDS.map((hand) => (
                 <Hand
                   key={hand}
                   side={hand}
-                  isOpen={isRevealed}
-                  hasCoin={coinHand === hand}
+                  handState={getHandState(hand)}
                   isSelected={selectedHand === hand}
                   isCorrect={isRevealed && coinHand === hand}
                   disabled={isComplete}
